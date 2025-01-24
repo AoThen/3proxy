@@ -21,8 +21,8 @@ jobs:
         REM SET "LIB=C:\Program Files\OpenSSL\lib\VC;%LIB%"
         SET "LIB=C:\Program Files\OpenSSL\lib\VC\static;%LIB%"
         openssl version
-        # "C:\Program Files\Git\mingw64\bin\curl.exe" -L -O https://github.com/muziling/openwrt-autocompile/raw/master/3proxy_for_win.diff
-        # git apply 3proxy_for_win.diff
+        "C:\Program Files\Git\mingw64\bin\curl.exe" -L -O https://github.com/muziling/openwrt-autocompile/raw/master/3proxy_for_win.diff
+        git apply 3proxy_for_win.diff
         NMAKE /F Makefile.msvc64
       shell: CMD
     - name: make check
