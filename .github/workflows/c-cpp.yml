@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make
-      run: make -f Makefile.win
+      run: make -f Makefile.msvc64
     - name: make check
       run: tree .
     - name: Upload for the assets
