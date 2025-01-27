@@ -28,7 +28,7 @@ REMOVECOMMAND = rm -f
 TYPECOMMAND = cat
 COMPATLIBS =
 MAKEFILE = Makefile.win
-PLUGINS = utf8tocp1251 WindowsAuthentication TrafficPlugin StringsPlugin
+PLUGINS = utf8tocp1251 WindowsAuthentication TrafficPlugin StringsPlugin PCREPlugin
 
 include Makefile.inc
 
