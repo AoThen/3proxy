@@ -8,7 +8,7 @@
 # library support
 
 
-BUILDDIR = /bin/
+BUILDDIR = ../bin/
 CC = gcc
 CFLAGS = -O2 -s -c -mthreads -DWITH_STD_MALLOC -DNOIPV6 -DNORADIUS
 COUT = -o 
@@ -28,7 +28,7 @@ REMOVECOMMAND = rm -f
 TYPECOMMAND = cat
 COMPATLIBS =
 MAKEFILE = Makefile.win
-PLUGINS = utf8tocp1251 WindowsAuthentication TrafficPlugin StringsPlugin PCREPlugin
+PLUGINS = utf8tocp1251 WindowsAuthentication TrafficPlugin StringsPlugin
 
 include Makefile.inc
 
