@@ -4,53 +4,36 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  actions: write
+
 jobs:
   build:
 
     runs-on: windows-latest
 
     steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+      
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
 
-    - name: Install Perl
-      run: |
-        choco install strawberryperl -y
-        echo "C:\strawberry\perl\bin" >> $GITHUB_PATH
-
-    - name: Install NASM
-      run: |
-        choco install nasm -y
-        echo "C:\Program Files (x86)\NASM" >> $GITHUB_PATH
-
     - name: Install OpenSSL
+      shell: powershell
       run: |
-        # Download OpenSSL source code
-        curl -o openssl.tar.gz https://www.openssl.org/source/openssl-3.0.15.tar.gz
-        tar -xzf openssl.tar.gz
-        cd openssl-3.0.15
+        # Install OpenSSL from slproweb
+        Invoke-WebRequest -OutFile Win64OpenSSL.exe "https://www.slproweb.com/download/Win64OpenSSL-3.4.0.exe"
+        Start-Process -FilePath ./Win64OpenSSL.exe -ArgumentList "/silent","/sp-","/suppressmsgboxes","/DIR=C:\OpenSSL" -Wait
+        Remove-Item Win64OpenSSL.exe
 
-        # Configure OpenSSL
-        perl Configure VC-WIN64A --prefix=$env:OPENSSL_INSTALL_DIR
-        nmake
+        # Add OpenSSL to PATH
+        echo "C:\OpenSSL\bin" | Out-File -Append -FilePath $env:GITHUB_PATH
+        echo "OpenSSL installed successfully"
 
-        # Install OpenSSL
-        nmake install
 
-        # Set environment variables
-        echo "OPENSSL_INSTALL_DIR=$env:OPENSSL_INSTALL_DIR" >> $GITHUB_ENV
-        echo "INCLUDE=$env:OPENSSL_INSTALL_DIR\include" >> $GITHUB_ENV
-        echo "LIB=$env:OPENSSL_INSTALL_DIR\lib" >> $GITHUB_ENV
-
-    - name: Set Environment Variables
-      run: |
-        echo "OPENSSL_INSTALL_DIR=C:\OpenSSL" >> $GITHUB_ENV
-        echo "INCLUDE=$env:OPENSSL_INSTALL_DIR\include" >> $GITHUB_ENV
-        echo "LIB=$env:OPENSSL_INSTALL_DIR\lib" >> $GITHUB_ENV
-
-    - name: Checkout Repository
-      uses: actions/checkout@v4
 
     - name: Modify Makefile
       run: |
@@ -59,7 +42,7 @@ jobs:
 
     - name: Build 3proxy
       run: nmake -f Makefile.msvc
-      
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -77,3 +60,8 @@ jobs:
     #     name: "3proxy"
     #     path: /bin/*
     #     if-no-files-found: error
+    - name: Delete workflow runs
+      uses: AoThen/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 5
