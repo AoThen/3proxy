@@ -10,16 +10,29 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
     - uses: actions/checkout@v4
-    - name: compile 3proxy (x64) with Visual C++
+    - name: Modify Makefile
       run: |
-        make -f Makefile.win
-      shell: CMD
-    - name: make check
-      run: tree .
-    - name: Upload for the assets
-      uses: actions/upload-artifact@v4
+        sed -i 's/libeay32.lib//g' Makefile.msvc
+        sed -i 's/ssleay32.lib//g' Makefile.msvc
+    - name: Build 3proxy
+      run: nmake -f Makefile.msvc
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
       with:
-        name: "3proxy"
-        path: /bin/*
-        if-no-files-found: error
+        name: 3proxy-win64
+        path: bin
+    # - name: compile 3proxy (x64) with Visual C++
+    #   run: |
+    #     make -f Makefile.win
+    #   shell: CMD
+    # - name: make check
+    #   run: tree .
+    # - name: Upload for the assets
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: "3proxy"
+    #     path: /bin/*
+    #     if-no-files-found: error
