@@ -12,13 +12,54 @@ jobs:
     steps:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
-    - uses: actions/checkout@v4
+
+
+    - name: Install Perl
+      run: |
+        choco install strawberryperl -y
+        echo "C:\strawberry\perl\bin" >> $GITHUB_PATH
+
+    - name: Install NASM
+      run: |
+        choco install nasm -y
+        echo "C:\Program Files (x86)\NASM" >> $GITHUB_PATH
+
+    - name: Install OpenSSL
+      run: |
+        # Download OpenSSL source code
+        curl -o openssl.tar.gz https://www.openssl.org/source/openssl-3.0.15.tar.gz
+        tar -xzf openssl.tar.gz
+        cd openssl-3.0.15
+
+        # Configure OpenSSL
+        perl Configure VC-WIN64A --prefix=$env:OPENSSL_INSTALL_DIR
+        nmake
+
+        # Install OpenSSL
+        nmake install
+
+        # Set environment variables
+        echo "OPENSSL_INSTALL_DIR=$env:OPENSSL_INSTALL_DIR" >> $GITHUB_ENV
+        echo "INCLUDE=$env:OPENSSL_INSTALL_DIR\include" >> $GITHUB_ENV
+        echo "LIB=$env:OPENSSL_INSTALL_DIR\lib" >> $GITHUB_ENV
+
+    - name: Set Environment Variables
+      run: |
+        echo "OPENSSL_INSTALL_DIR=C:\OpenSSL" >> $GITHUB_ENV
+        echo "INCLUDE=$env:OPENSSL_INSTALL_DIR\include" >> $GITHUB_ENV
+        echo "LIB=$env:OPENSSL_INSTALL_DIR\lib" >> $GITHUB_ENV
+
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
     - name: Modify Makefile
       run: |
         sed -i 's/libeay32.lib//g' Makefile.msvc
         sed -i 's/ssleay32.lib//g' Makefile.msvc
+
     - name: Build 3proxy
       run: nmake -f Makefile.msvc
+      
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
