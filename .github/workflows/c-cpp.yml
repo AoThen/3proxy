@@ -17,49 +17,52 @@ jobs:
       uses: actions/checkout@v4
 
       
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
+    # - name: Setup MSVC
+    #   uses: ilammy/msvc-dev-cmd@v1
 
 
-    - name: Install OpenSSL
-      shell: powershell
-      run: |
-        # Install OpenSSL from slproweb
-        Invoke-WebRequest -OutFile Win64OpenSSL.exe "https://www.slproweb.com/download/Win64OpenSSL-3.4.0.exe"
-        Start-Process -FilePath ./Win64OpenSSL.exe -ArgumentList "/silent","/sp-","/suppressmsgboxes","/DIR=C:\OpenSSL" -Wait
-        Remove-Item Win64OpenSSL.exe
-
-        # Add OpenSSL to PATH
-        echo "C:\OpenSSL\bin" | Out-File -Append -FilePath $env:GITHUB_PATH
-        echo "OpenSSL installed successfully"
-
-
-
-    - name: Modify Makefile
-      run: |
-        sed -i 's/libeay32.lib//g' Makefile.msvc
-        sed -i 's/ssleay32.lib//g' Makefile.msvc
-
-    - name: Build 3proxy
-      run: nmake -f Makefile.msvc
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: 3proxy-win64
-        path: bin
-    # - name: compile 3proxy (x64) with Visual C++
+    # - name: Install OpenSSL
+    #   shell: powershell
     #   run: |
-    #     make -f Makefile.win
-    #   shell: CMD
-    # - name: make check
-    #   run: tree .
-    # - name: Upload for the assets
+    #     # Install OpenSSL from slproweb
+    #     Invoke-WebRequest -OutFile Win64OpenSSL.exe "https://www.slproweb.com/download/Win64OpenSSL-3.4.0.exe"
+    #     Start-Process -FilePath ./Win64OpenSSL.exe -ArgumentList "/silent","/sp-","/suppressmsgboxes","/DIR=C:\OpenSSL" -Wait
+    #     Remove-Item Win64OpenSSL.exe
+
+    #     # Add OpenSSL to PATH
+    #     echo "C:\OpenSSL\bin" | Out-File -Append -FilePath $env:GITHUB_PATH
+    #     echo "OpenSSL installed successfully"
+
+
+
+    # - name: Modify Makefile
+    #   run: |
+    #     sed -i 's/libeay32.lib//g' Makefile.msvc
+    #     sed -i 's/ssleay32.lib//g' Makefile.msvc
+
+    # - name: Build 3proxy
+    #   run: nmake -f Makefile.msvc
+
+    # - name: Upload Artifact
     #   uses: actions/upload-artifact@v4
     #   with:
-    #     name: "3proxy"
-    #     path: /bin/*
-    #     if-no-files-found: error
+    #     name: 3proxy-win64
+    #     path: bin
+    - name: Add msbuild to PATH (Windows)
+      uses: microsoft/setup-msbuild@v2
+
+    - name: compile 3proxy (x64) with Visual C++
+      run: |
+        make -f Makefile.win
+      shell: CMD
+    - name: make check
+      run: tree .
+    - name: Upload for the assets
+      uses: actions/upload-artifact@v4
+      with:
+        name: "3proxy"
+        path: bin
+        if-no-files-found: error
     - name: Delete workflow runs
       uses: AoThen/delete-workflow-runs@main
       with:
