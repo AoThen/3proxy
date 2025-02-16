@@ -1,0 +1,38 @@
+name: Win C/C++ CI
+
+on:
+  # push:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Add msbuild to PATH (Windows)
+      uses: microsoft/setup-msbuild@v2
+
+    - name: compile 3proxy (x64) with Visual C++
+      run: |
+        make -f Makefile.win
+      shell: CMD
+    - name: make check
+      run: tree .
+    - name: Upload for the assets
+      uses: actions/upload-artifact@v4
+      with:
+        name: "3proxy"
+        path: bin
+        if-no-files-found: error
+    - name: Delete workflow runs
+      uses: AoThen/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 1
