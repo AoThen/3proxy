@@ -46,10 +46,10 @@ jobs:
         ls -lh bin/
         file bin/* || true
 
-    - name: Compress with PowerShell (ZIP)
-      shell: pwsh
-      run: |
-        Compress-Archive -Path "bin/*" -DestinationPath ../3proxy-windows-x64.zip -Force
+    # - name: Compress with PowerShell (ZIP)
+    #   shell: pwsh
+    #   run: |
+    #     Compress-Archive -Path "bin/*" -DestinationPath ../3proxy-windows-x64.zip -Force
 
     # - name: Create release archive
     #   shell: msys2 {0}
@@ -64,7 +64,6 @@ jobs:
         name: 3proxy-windows-x64
         path: |
           bin/
-          3proxy-windows-x64.zip
         if-no-files-found: error
 
     - name: Delete old workflow runs

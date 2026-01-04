@@ -37,11 +37,11 @@ jobs:
         ls -lh bin/
         file bin/*
 
-    - name: Create release archive
-      run: |
-        cd bin
-        tar -czf ../3proxy-linux-x64.tar.gz *
-        cd ..
+    # - name: Create release archive
+    #   run: |
+    #     cd bin
+    #     tar -czf ../3proxy-linux-x64.tar.gz *
+    #     cd ..
 
     - name: Upload binaries
       uses: actions/upload-artifact@v4
@@ -49,7 +49,6 @@ jobs:
         name: 3proxy-linux-x64
         path: |
           bin/
-          3proxy-linux-x64.tar.gz
         if-no-files-found: error
 
     - name: Delete old workflow runs
