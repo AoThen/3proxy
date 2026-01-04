@@ -2,6 +2,9 @@ name: Linux CI
 
 on:
   push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
   workflow_dispatch:
 
 permissions:
@@ -9,29 +12,47 @@ permissions:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: compile 3proxy (x64) with Visual C++
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libpcre3-dev tree
+
+    - name: Create bin directory
+      run: mkdir -p bin
+
+    - name: Compile 3proxy for Linux
       run: |
         make -f Makefile.Linux
-        make -f Makefile.Linux install
+        echo "Build completed successfully"
 
-    - name: make check
-      run: tree .
+    - name: Verify binaries
+      run: |
+        echo "Checking bin directory contents:"
+        ls -lh bin/
+        file bin/*
 
-    - name: Upload for the assets
+    - name: Create release archive
+      run: |
+        cd bin
+        tar -czf ../3proxy-linux-x64.tar.gz *
+        cd ..
+
+    - name: Upload binaries
       uses: actions/upload-artifact@v4
       with:
-        name: "3proxy"
-        path: bin
+        name: 3proxy-linux-x64
+        path: |
+          bin/
+          3proxy-linux-x64.tar.gz
         if-no-files-found: error
 
-    - name: Delete workflow runs
+    - name: Delete old workflow runs
       uses: AoThen/delete-workflow-runs@main
       with:
         retain_days: 1

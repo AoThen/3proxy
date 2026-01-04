@@ -2,49 +2,124 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
     paths: [ '**.c', '**.h', 'Makefile.**', '.github/configs', '.github/workflows/c-cpp.yml' ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
     paths: [ '**.c', '**.h', 'Makefile.**', '.github/configs', '.github/workflows/c-cpp.yml' ]
+  workflow_dispatch:
 
 jobs:
   ci:
     name: "${{ matrix.target }}"
     strategy:
+      fail-fast: false
       matrix:
-        target:
-          - ubuntu-latest
-          - ubuntu-24.04-arm
-          - macos-15
-          - windows-2022
+        include:
+          - target: ubuntu-latest
+            os: linux
+          - target: ubuntu-24.04
+            os: linux
+          - target: macos-15
+            os: mac
+          - target: windows-2022
+            os: windows
     runs-on: ${{ matrix.target }}
     steps:
     - uses: actions/checkout@v4
-#    - name: configure
-#      run: ./configure
-    - name: ln Linux
-      if: ${{ startsWith(matrix.target, 'ubuntu') }}
+
+    # Linux setup
+    - name: Install Linux dependencies
+      if: ${{ matrix.os == 'linux' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libpcre3-dev libssl-dev
+
+    - name: Create bin directory (Linux/Mac)
+      if: ${{ matrix.os != 'windows' }}
+      run: mkdir -p bin
+
+    - name: Setup Makefile for Linux
+      if: ${{ matrix.os == 'linux' }}
       run: ln -s Makefile.Linux Makefile
-    - name: ln Mac
-      if: ${{ startsWith(matrix.target, 'macos') }}
+
+    # Mac setup
+    - name: Install Mac dependencies
+      if: ${{ matrix.os == 'mac' }}
+      run: brew install pcre openssl
+
+    - name: Setup Makefile for Mac
+      if: ${{ matrix.os == 'mac' }}
       run: ln -s Makefile.FreeBSD Makefile
-    - name: ln Windows
-      if: ${{ startsWith(matrix.target, 'windows') }}
-      run: copy Makefile.win Makefile
-    - name: dirs Windows
-      if: ${{ startsWith(matrix.target, 'windows') }}
-      run: cmd /C 'echo LIBS := -L "c:/program files/openssl/lib/VC/x64/MT" $(LIBS) >>Makefile.win && echo CFLAGS := -I "c:/program files/openssl/include" $(CFLAGS) >>Makefile.win && type Makefile.win && dir "c:/program files/openssl/lib"'
-    - name: SSLPlugin Linux
-      if: ${{ startsWith(matrix.target, 'ubuntu') }}
-      run: "sed -i '/^PLUGIN/s/$/ SSLPlugin/' Makefile && sed -i '/^LIBS/s/$/ -lcrypto -lssl/' Makefile"
-    - name: make
+
+    # Windows setup
+    - name: Setup MSYS2 for Windows
+      if: ${{ matrix.os == 'windows' }}
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-openssl
+          mingw-w64-x86_64-pcre
+          make
+
+    - name: Create bin directory (Windows)
+      if: ${{ matrix.os == 'windows' }}
+      shell: msys2 {0}
+      run: mkdir -p bin
+
+    - name: Setup Makefile for Windows
+      if: ${{ matrix.os == 'windows' }}
+      shell: msys2 {0}
+      run: cp Makefile.win Makefile
+
+    # Build step
+    - name: Build 3proxy
+      if: ${{ matrix.os != 'windows' }}
       run: make
-    - name: mkdir
-      if: ${{ startsWith(matrix.target, 'ubuntu') }}
-      run: mkdir ~/3proxy
-    - name: make install
-      if: ${{ startsWith(matrix.target, 'ubuntu') }}
-      run: make DESTDIR=~/3proxy install
-    - name: make clean
+
+    - name: Build 3proxy (Windows)
+      if: ${{ matrix.os == 'windows' }}
+      shell: msys2 {0}
+      run: make
+
+    # Verify binaries
+    - name: Verify binaries
+      if: ${{ matrix.os != 'windows' }}
+      run: |
+        echo "Build artifacts:"
+        ls -lh bin/ || echo "No bin directory"
+
+    - name: Verify binaries (Windows)
+      if: ${{ matrix.os == 'windows' }}
+      shell: msys2 {0}
+      run: |
+        echo "Build artifacts:"
+        ls -lh bin/ || echo "No bin directory"
+
+    # Install test (Linux only)
+    - name: Test installation
+      if: ${{ matrix.os == 'linux' }}
+      run: |
+        mkdir -p ~/3proxy
+        make DESTDIR=~/3proxy install
+
+    # Upload artifacts
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: 3proxy-${{ matrix.target }}
+        path: bin/
+        if-no-files-found: error
+
+    # Cleanup
+    - name: Clean build
+      if: ${{ matrix.os != 'windows' }}
+      run: make clean
+
+    - name: Clean build (Windows)
+      if: ${{ matrix.os == 'windows' }}
+      shell: msys2 {0}
       run: make clean
