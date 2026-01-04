@@ -191,7 +191,7 @@ void * tlsprchild(struct clientparam* param) {
 	    myfree(param->hostname);
 	    param->hostname = NULL;
 	}
-	else if (parsehostname(sni, param, param->srv->targetport? param->srv->targetport:443)) RETURN (100);
+	else if (parsehostname(sni, param, param->srv->targetport? ntohs(param->srv->targetport):443)) RETURN (100);
 	if (!param->hostname)param->hostname = (unsigned char *)mystrdup(sni);
     }
     else if (res < 0 && param->srv->requirecert) RETURN(310-res);
@@ -220,8 +220,8 @@ void * tlsprchild(struct clientparam* param) {
     if (res < 0) RETURN(350-res);
  }
  if(param->srv->requirecert > 2){
-    if(lv > 3) RETURN(370);
     int srvcert=0, clicert=0, reqcert=0, len, rlen, done;
+    if(lv > 3) RETURN(370);
     for(done=0;!done;) {
 	len = param->srvinbuf;
 	if(socksend(param, param->clisock, param->srvbuf,len, conf.timeouts[STRING_S]) != len) RETURN(371);

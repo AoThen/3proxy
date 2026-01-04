@@ -181,12 +181,13 @@ typedef enum {
 	S_DNSPR,
 	S_FTPPR,
 	S_SMTPP,
-	S_REVLI,
-	S_REVCO,
-	S_ZOMBIE,
 	S_AUTO,
-	S_TLSPR
+	S_TLSPR,
+	S_ZOMBIE
 }PROXYSERVICE;
+
+#define MAX_SERVICE S_ZOMBIE
+
 
 struct clientparam;
 struct node;
@@ -266,7 +267,7 @@ struct passwords {
 };
 
 typedef enum {
-	R_TCP,
+	R_TCP = 1,
 	R_CONNECT,
 	R_SOCKS4,
 	R_SOCKS5,
@@ -281,8 +282,19 @@ typedef enum {
 	R_SOCKS5B,
 	R_ADMIN,
 	R_EXTIP,
-	R_TLS
+	R_TLS,
+	R_HA,
+	R_DNS
 } REDIRTYPE;
+
+struct redirdesc {
+    REDIRTYPE redir;
+    char * name;
+    void * (*func)(struct clientparam *);
+};
+
+extern struct redirdesc redirs[];
+
 
 struct chain {
 	struct chain * next;
@@ -404,6 +416,8 @@ struct filter {
 	FILTER_OPEN *filter_open;
 	FILTER_CLIENT *filter_client;
 	FILTER_BUFFER *filter_request;
+	FILTER_PREDATA *filter_connect;
+	FILTER_PREDATA *filter_afterauth;
 	FILTER_BUFFER *filter_header_cli;
 	FILTER_BUFFER *filter_header_srv;
 	FILTER_PREDATA *filter_predata;
@@ -482,7 +496,7 @@ struct srvparam {
 	int needuser;
 	int silent;
 	int transparent;
-	int nfilters, nreqfilters, nhdrfilterscli, nhdrfilterssrv, npredatfilters, ndatfilterscli, ndatfilterssrv;
+	int nfilters, nreqfilters, nconnectfilters, nafterauthfilters, nhdrfilterscli, nhdrfilterssrv, npredatfilters, ndatfilterscli, ndatfilterssrv;
 	int family;
 	int stacksize;
 	int noforce;
@@ -490,6 +504,7 @@ struct srvparam {
 	int clisockopts, srvsockopts, lissockopts, cbcsockopts, cbssockopts;
 	int gracetraf, gracenum, gracedelay;
 	int requirecert;
+	int haproxy;
 #ifdef WITHSPLICE
 	int usesplice;
 #endif
@@ -537,7 +552,7 @@ struct clientparam {
 
 
 	struct filterp	*filters,
-			**reqfilters,
+			**reqfilters, **connectfilters, **afterauthfilters,
 			**hdrfilterscli, **hdrfilterssrv,
 			**predatfilters, **datfilterscli, **datfilterssrv;
 
@@ -552,18 +567,21 @@ struct clientparam {
 
 	uint64_t	waitclient64,
 			waitserver64,
-			cycles;
+			cycles,
+			threadid;
 
 	int	redirected,
 		operation,
-		nfilters, nreqfilters, nhdrfilterscli, nhdrfilterssrv, npredatfilters, ndatfilterscli, ndatfilterssrv,
+		nfilters,
+		nreqfilters, nconnectfilters, nafterauthfilters,
+		nhdrfilterscli, nhdrfilterssrv,
+		npredatfilters, ndatfilterscli, ndatfilterssrv,
 		unsafefilter,
 		bandlimver;
 
 	int	res,
 		status;
 	int	pwtype,
-		threadid,
 		weight,
 		nolog,
 		nolongdatfilter,
@@ -572,7 +590,8 @@ struct clientparam {
 		chunked,
 		paused,
 		version,
-		connlim;
+		connlim,
+		predatdone;
 
 	unsigned char 	*hostname,
 			*username,
@@ -619,6 +638,11 @@ struct filemon {
 
 
 struct extparam {
+#ifdef _WIN32
+	HANDLE threadinit[2];
+#else
+	int threadinit[2];
+#endif
 	int timeouts[12];
 	struct ace * acl;
 	char * conffile;
@@ -627,11 +651,12 @@ struct extparam {
 	struct trafcount * trafcounter;
 	struct srvparam *services;
 	int stacksize,
-		threadinit, counterd, haveerror, rotate, paused, archiverc,
+		counterd, haveerror, rotate, paused, archiverc,
 		demon, maxchild, backlog, needreload, timetoexit, version, noforce, bandlimver, parentretries;
 	int authcachetype, authcachetime;
 	int filtermaxsize;
 	int gracetraf, gracenum, gracedelay;
+	int maxseg;
 	unsigned char *logname, **archiver;
 	ROTATION logtype, countertype;
 	char * counterfile;

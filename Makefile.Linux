@@ -58,7 +58,8 @@ INSTALL_OBJS	= bin/3proxy \
 		  bin/proxy \
 		  bin/socks \
 		  bin/tcppm \
-		  bin/udppm
+		  bin/udppm \
+		  bin/tlspr
 		  
 
 INSTALL_CFG	 = scripts/3proxy.cfg.chroot
@@ -102,7 +103,7 @@ install-chroot-dir:
 	$(INSTALL_BIN) -d $(CHROOTDIR)/libexec
 	chmod -R o-rwx $(CHROOTDIR)
 
-install-etc-default-config:
+install-etc-default-config: install-chroot-dir
 	if [ ! -d $(INSTALL_CFG_DEST) ]; then \
 	   ln -s $(CHROOTREL)/conf $(INSTALL_CFG_DEST); \
 	   $(INSTALL_BIN) $(INSTALL_CFG) $(ETCDIR)/3proxy.cfg; \

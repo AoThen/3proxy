@@ -10,21 +10,21 @@ typedef void *SSL_CONN;
 //
 typedef void *SSL_CERT;
 
+struct alpn {
+    unsigned char *protos;
+    unsigned int protos_len;
+};
+
 struct ssl_config {
-    int mitm;
-    int serv;
-    char *certcache;
     X509 *CA_cert;
     X509 *server_cert;
+    X509 *client_cert;
     EVP_PKEY *CA_key;
     EVP_PKEY *server_key;
+    EVP_PKEY *client_key;
     SSL_CTX *cli_ctx;
     SSL_CTX *srv_ctx;
-    int client_min_proto_version;
-    int client_max_proto_version;
-    int server_min_proto_version;
-    int server_max_proto_version;
-    int client_verify;
+    char *certcache;
     char * client_ciphersuites;
     char * server_ciphersuites;
     char * client_cipher_list;
@@ -32,6 +32,21 @@ struct ssl_config {
     char * client_ca_file;
     char * client_ca_dir;
     char * client_ca_store;
+    char * server_ca_file;
+    char * server_ca_dir;
+    char * server_ca_store;
+    char * client_sni;
+    struct alpn client_alpn_protos;
+    int mitm;
+    int serv;
+    int cli;
+    int client_min_proto_version;
+    int client_max_proto_version;
+    int server_min_proto_version;
+    int server_max_proto_version;
+    int client_verify;
+    int server_verify;
+    int client_mode;
 };
 
 typedef struct ssl_config SSL_CONFIG;
@@ -66,6 +81,7 @@ void _ssl_cert_free(SSL_CERT cert);
 // Global (de)initialization
 //
 void ssl_init(void);
+char * getSSLErr(void);
 
-
+extern struct sockfuncs sso;
 #endif // __my_ssl_h__

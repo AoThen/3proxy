@@ -325,24 +325,12 @@ static void * ef_chain_next(struct node * node){
 }
 
 static void * ef_chain_type(struct node * node){
-	switch (((struct chain *)node->value) -> type) {
-		case R_TCP:
-			return "tcp";
-		case R_CONNECT:
-			return "connect";
-		case R_SOCKS4:
-			return "socks4";
-		case R_SOCKS5:
-			return "socks5";
-		case R_HTTP:
-			return "http";
-		case R_FTP:
-			return "ftp";
-		case R_POP3:
-			return "pop3";
-		default:
-			return "";
+	int i;
+	
+	for(i=0; redirs[i].name; i++){
+	    if(((struct chain *)node->value) -> type == redirs[i].redir) return redirs[i].name;
 	}
+	return "";
 }
 
 static void * ef_chain_addr(struct node * node){
@@ -761,7 +749,7 @@ static struct property prop_server[] = {
 
 static struct property prop_client[] = {
 	{prop_client + 1, "servicetype", ef_client_type, TYPE_STRING, "type of the client"},
-	{prop_client + 2, "threadid", ef_client_threadid, TYPE_INTEGER, "process thread id"},
+	{prop_client + 2, "threadid", ef_client_threadid, TYPE_UNSIGNED64, "process thread id"},
 	{prop_client + 3, "starttime", ef_client_starttime, TYPE_DATETIME, "client started seconds"},
 	{prop_client + 4, "starttime_msec", ef_client_starttime_msec, TYPE_UNSIGNED, "client started milliseconds"},
 	{prop_client + 5, "redirected", ef_client_redirected, TYPE_INTEGER, "number of redirections"},

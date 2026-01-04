@@ -74,6 +74,37 @@ void * threadfunc (void *p) {
 #endif
 #endif
 
+	if(param->srv->haproxy){
+	    char buf[128];
+	    int i;
+	    i = sockgetlinebuf(param, CLIENT, (unsigned char *)buf, sizeof(buf)-1, '\n', conf.timeouts[STRING_S]);
+	    if(i > 12 && !strncasecmp(buf, "PROXY TCP", 9)){
+		char *token, *token2=NULL;
+		unsigned short u1=0, u2=0;
+		buf[i] = 0;
+		token = strchr(buf, ' ');
+		if(token) token = strchr(token+1, ' ');
+		if(token) token++;
+		if(token) token2 = strchr(token+1, ' ');
+		if(token2) {
+		    *token2 = 0;
+		    getip46(46, (unsigned char*) token, (struct sockaddr *)&param->sincr);
+		    token = token2+1;
+		    token2 = strchr(token, ' ');
+		}
+		if(token2) {
+		    *token2 = 0;
+		    getip46(46, (unsigned char *) token, (struct sockaddr *)&param->sincl);
+		    token = token2+1;
+		    token2 = strchr(token, ' ');
+		}
+		if(token){
+		    sscanf(token,"%hu%hu", &u1, &u2);
+		    if(u1) *SAPORT(&param->sincr) = htons(u1);
+		    if(u2) *SAPORT(&param->sincl) = htons(u1);
+		}
+	    }
+	}
 	((struct clientparam *) p)->srv->pf((struct clientparam *)p);
  }
 #ifdef _WIN32
@@ -83,6 +114,15 @@ void * threadfunc (void *p) {
 #endif
 }
 #undef param
+
+int pushthreadinit(){
+    return 
+#ifdef _WIN32
+    WriteFile(conf.threadinit[1], "1", 1, NULL, NULL);
+#else
+    write(conf.threadinit[1], "1", 1);
+#endif
+}
 
 
 struct socketoptions sockopts[] = {
@@ -131,6 +171,9 @@ struct socketoptions sockopts[] = {
 #ifdef TCP_FASTOPEN_CONNECT
 	{TCP_FASTOPEN_CONNECT, "TCP_FASTOPEN_CONNECT"},
 #endif
+#ifdef TCP_MAXSEG
+	{TCP_MAXSEG, "TCP_MAXSEG"},
+#endif
 	{0, NULL}
 };
 
@@ -153,6 +196,12 @@ void setopts(SOCKET s, int opts){
 	int i, opt, set;
 	for(i = 0; opts >= (opt = (1<<i)); i++){
 		set = 1;
+#ifdef TCP_MAXSEG
+		if(sockopts[i].opt == TCP_MAXSEG){
+		    if(!conf.maxseg) continue;
+		    set = conf.maxseg;
+		}
+#endif
 		if(opts & opt) setsockopt(s, *sockopts[i].optname == 'T'? IPPROTO_TCP:
 #ifdef SOL_IP
 			*sockopts[i].optname == 'I'? SOL_IP: 
@@ -417,6 +466,9 @@ int MODULEMAINFUNC (int argc, char** argv){
 		 case 'h':
 			hostname = argv[i] + 2;
 			break;
+		 case 'H':
+			srv.haproxy=1;
+			break;
 		 case 'c':
 			srv.requirecert = 1;
 			if(isdigit(argv[i][2])) srv.requirecert = atoi(argv[i]+2);
@@ -492,7 +544,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 	if (error || i!=argc) {
 #ifndef STDMAIN
 		haveerror = 1;
-		conf.threadinit = 0;
+		pushthreadinit();
 #endif
 		fprintf(stderr, "%s of %s\n"
 			"Usage: %s options\n"
@@ -524,7 +576,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 	if (error || argc != i+3 || *argv[i]=='-'|| (*SAPORT(&srv.intsa) = htons((unsigned short)atoi(argv[i])))==0 || (srv.targetport = htons((unsigned short)atoi(argv[i+2])))==0) {
 #ifndef STDMAIN
 		haveerror = 1;
-		conf.threadinit = 0;
+		pushthreadinit();
 #endif
 		fprintf(stderr, "%s of %s\n"
 			"Usage: %s options"
@@ -590,7 +642,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 #ifndef STDMAIN
 
  copyfilter(conf.filters, &srv);
- conf.threadinit = 0;
+ pushthreadinit();
 
 
 #endif
@@ -666,7 +718,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 		defparam.clisock = sock;
 
 	if(!srv.silent && !iscbc){
-		sprintf((char *)buf, "Accepting connections [%u/%u]", (unsigned)getpid(), (unsigned)pthread_self());
+		sprintf((char *)buf, "Accepting connections [%"PRINTF_INT64_MODIFIER"u/%"PRINTF_INT64_MODIFIER"u]", (uint64_t)getpid(), (uint64_t)pthread_self());
 		dolog(&defparam, buf);
 	}
  }
@@ -864,7 +916,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 #endif
 	srv.childcount++;
 	if (h) {
-		newparam->threadid = (unsigned)thread;
+		newparam->threadid = (uint64_t)thread;
 		CloseHandle(h);
 	}
 	else {
@@ -881,7 +933,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 		if(!srv.silent)dolog(&defparam, buf);
 	}
 	else {
-		newparam->threadid = (unsigned)thread;
+		newparam->threadid = (uint64_t)thread;
 	}
 #endif
 	pthread_mutex_unlock(&srv.counter_mutex);
@@ -1023,6 +1075,8 @@ void freeparam(struct clientparam * param) {
 	if(param->datfilterssrv) myfree(param->datfilterssrv);
 #ifndef STDMAIN
 	if(param->reqfilters) myfree(param->reqfilters);
+	if(param->connectfilters) myfree(param->connectfilters);
+	if(param->afterauthfilters) myfree(param->afterauthfilters);
 	if(param->hdrfilterscli) myfree(param->hdrfilterscli);
 	if(param->hdrfilterssrv) myfree(param->hdrfilterssrv);
 	if(param->predatfilters) myfree(param->predatfilters);
@@ -1074,6 +1128,19 @@ void freeparam(struct clientparam * param) {
 	if(param->extusername) myfree(param->extusername);
 	if(param->extpassword) myfree(param->extpassword);
 	myfree(param);
+}
+
+FILTER_ACTION handleconnectflt(struct clientparam *cparam){
+#ifndef STDMAIN
+	FILTER_ACTION action;
+	int i;
+
+	for(i=0; i<cparam->nconnectfilters ;i++){
+		action =  (*cparam->connectfilters[i]->filter->filter_connect)(cparam->connectfilters[i]->data, cparam);
+		if(action!=CONTINUE) return action;
+	}
+#endif
+	return PASS;
 }
 
 
@@ -1261,6 +1328,8 @@ void copyfilter (struct filter *filter, struct srvparam *srv){
 	if(srv->nfilters>0)srv->filter[srv->nfilters - 1].next = srv->filter + srv->nfilters;
 	srv->nfilters++;
 	if(filter->filter_request)srv->nreqfilters++;
+	if(filter->filter_connect)srv->nconnectfilters++;
+	if(filter->filter_afterauth)srv->nafterauthfilters++;
 	if(filter->filter_header_srv)srv->nhdrfilterssrv++;
 	if(filter->filter_header_cli)srv->nhdrfilterscli++;
 	if(filter->filter_predata)srv->npredatfilters++;
@@ -1278,6 +1347,8 @@ FILTER_ACTION makefilters (struct srvparam *srv, struct clientparam *param){
 
 	if(!(param->filters = myalloc(sizeof(struct filterp) * srv->nfilters)) ||
 	   (srv->nreqfilters && !(param->reqfilters = myalloc(sizeof(struct filterp *) * srv->nreqfilters))) ||
+	   (srv->nconnectfilters && !(param->connectfilters = myalloc(sizeof(struct filterp *) * srv->nconnectfilters))) ||
+	   (srv->nafterauthfilters && !(param->afterauthfilters = myalloc(sizeof(struct filterp *) * srv->nafterauthfilters))) ||
 	   (srv->nhdrfilterssrv && !(param->hdrfilterssrv = myalloc(sizeof(struct filterp *) * srv->nhdrfilterssrv))) ||
 	   (srv->nhdrfilterscli && !(param->hdrfilterscli = myalloc(sizeof(struct filterp *) * srv->nhdrfilterscli))) ||
 	   (srv->npredatfilters && !(param->predatfilters = myalloc(sizeof(struct filterp *) * srv->npredatfilters))) ||
@@ -1295,6 +1366,8 @@ FILTER_ACTION makefilters (struct srvparam *srv, struct clientparam *param){
 		if(action > CONTINUE) return action;
 		param->filters[param->nfilters].filter = srv->filter + i;
 		if(srv->filter[i].filter_request)param->reqfilters[param->nreqfilters++] = param->filters + param->nfilters;
+		if(srv->filter[i].filter_connect)param->connectfilters[param->nconnectfilters++] = param->filters + param->nfilters;
+		if(srv->filter[i].filter_afterauth)param->afterauthfilters[param->nafterauthfilters++] = param->filters + param->nfilters;
 		if(srv->filter[i].filter_header_cli)param->hdrfilterscli[param->nhdrfilterscli++] = param->filters + param->nfilters;
 		if(srv->filter[i].filter_header_srv)param->hdrfilterssrv[param->nhdrfilterssrv++] = param->filters + param->nfilters;
 		if(srv->filter[i].filter_predata)param->predatfilters[param->npredatfilters++] = param->filters + param->nfilters;
@@ -1340,6 +1413,20 @@ void freeacl(struct ace *ac){
 	}
 }
 
+FILTER_ACTION handleafterauthflt(struct clientparam *cparam){
+#ifndef STDMAIN
+	FILTER_ACTION action;
+	int i;
+
+	for(i=0; i<cparam->nafterauthfilters ;i++){
+		action =  (*cparam->afterauthfilters[i]->filter->filter_afterauth)(cparam->afterauthfilters[i]->data, cparam);
+		if(action!=CONTINUE) return action;
+	}
+#endif
+	return PASS;
+}
+
+
 FILTER_ACTION handlereqfilters(struct clientparam *param, unsigned char ** buf_p, int * bufsize_p, int offset, int * length_p){
 	FILTER_ACTION action;
 	int i;
@@ -1380,6 +1467,8 @@ FILTER_ACTION handlepredatflt(struct clientparam *cparam){
 	FILTER_ACTION action;
 	int i;
 
+	if(cparam->predatdone) return PASS;
+	cparam->predatdone = 1;
 	for(i=0; i<cparam->npredatfilters ;i++){
 		action =  (*cparam->predatfilters[i]->filter->filter_predata)(cparam->predatfilters[i]->data, cparam);
 		if(action!=CONTINUE) return action;
